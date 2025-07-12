@@ -1,2 +1,7 @@
-test .......
+test .
+__
+
+// "build:docker": "docker build -t infra-hw .",
+// "start:docker": "docker run -p 3000:3000 --name infra-hw -d --rm infra-hw",
+// "stop:docker": "docker stop infra-hw"
 

@@ -1,0 +1,130 @@
+name: Hotfix
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Версия релиза для фикса'
+        required: true
+        type: string
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 'releases/${{ github.event.inputs.release_version }}'
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 'releases/${{ github.event.inputs.release_version }}'
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run test
+
+  hotfix:
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    permissions:
+      contents: write
+      issues: write
+    env:
+      REGISTRY: ${{ secrets.REGISTRY_ID }}
+      RELEASE_VERSION: ${{ github.event.inputs.release_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 'releases/${{ github.event.inputs.release_version }}'
+          fetch-depth: 0
+
+      - name: Fetch all tags
+        run: git fetch --tags --force
+
+      - name: Set fix number
+        id: set-fix-number
+        run: echo "FIX_NUMBER=${{ github.run_number }}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        env:
+          PA_SA_KEY: ${{ secrets.PA_SA_KEY }}
+        run: |
+          echo "$PA_SA_KEY" | docker login \
+            --username json_key \
+            --password-stdin cr.yandex
+          
+          docker build -t $REGISTRY/app:${RELEASE_VERSION}_fix${{ steps.set-fix-number.outputs.FIX_NUMBER }} .
+          docker tag $REGISTRY/app:${RELEASE_VERSION}_fix${{ steps.set-fix-number.outputs.FIX_NUMBER }} \
+            $REGISTRY/app:${RELEASE_VERSION}_latest
+          
+          docker push $REGISTRY/app:${RELEASE_VERSION}_fix${{ steps.set-fix-number.outputs.FIX_NUMBER }}
+          docker push $REGISTRY/app:${RELEASE_VERSION}_latest
+
+      - name: Determine last tag in release
+        id: find_prev
+        run: |
+          PREV=$(git tag --list "v${RELEASE_VERSION}*" --sort=-creatordate | head -n 1)
+          
+          if [ -z "$PREV" ]; then
+            PREV="v${RELEASE_VERSION}"
+          fi
+          echo "previous_tag=$PREV" >> $GITHUB_OUTPUT
+          echo "Found previous tag: $PREV"
+
+      - name: Create fix tag
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag v${RELEASE_VERSION}_fix${{ steps.set-fix-number.outputs.FIX_NUMBER }}
+          git push origin v${RELEASE_VERSION}_fix${{ steps.set-fix-number.outputs.FIX_NUMBER }}
+
+      - name: Get commit history
+        id: get-commits
+        run: |
+          PREV_TAG="${{ steps.find_prev.outputs.previous_tag }}"
+          echo "Using previous tag: $PREV_TAG"
+          
+          COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s" --no-merges)
+          echo "COMMITS<<EOF" >> $GITHUB_ENV
+          echo "$COMMITS" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Add comment to release issue
+        env:
+          FIX_NUMBER: ${{ steps.set-fix-number.outputs.FIX_NUMBER }}
+        run: |
+          sudo apt-get install -y gh  
+          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
+          
+          ISSUE_ID=$(gh issue list --search "Release v${RELEASE_VERSION} in:title" --json number -q '.[0].number')
+          
+          if [ -z "$ISSUE_ID" ]; then
+            echo "⚠️ Release issue not found!"
+            exit 0  
+          fi
+          
+          COMMENT=$(cat <<EOF
+          ### 🔧 Hotfix applied
+          
+          **Fix version:** ${RELEASE_VERSION}_fix${FIX_NUMBER}  
+          **Date:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')  
+          **Author:** ${{ github.actor }}  
+          **Docker image:** \`${{ env.REGISTRY }}/app:${RELEASE_VERSION}_fix${FIX_NUMBER}\`  
+          
+          **Commits since last release:**
+          ${{ env.COMMITS }}
+          EOF
+          )
+          
+          gh issue comment $ISSUE_ID --body "$COMMENT"
