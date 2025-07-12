@@ -9,9 +9,6 @@
     "lint": "eslint ./src",
     "build:docker": "docker build -t shri-infra .",
     "start:docker": "docker run -p 3000:3000 shri-infra"
-    // "build:docker": "docker build -t infra-hw .",
-    // "start:docker": "docker run -p 3000:3000 --name infra-hw -d --rm infra-hw",
-    // "stop:docker": "docker stop infra-hw"
   },
   "dependencies": {
     "@bem-react/classname": "^1.6.0",
