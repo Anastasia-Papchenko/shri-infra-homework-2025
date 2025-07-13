@@ -1,14 +1,15 @@
-name: Hotfix
+name: Fix Pipeline
 on:
   workflow_dispatch:
     inputs:
       release_version:
-        description: 'Версия релиза для фикса'
+        description: 'Версия релиза для исправления'
         required: true
         type: string
 
 jobs:
   lint:
+    name: Validate Code Quality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,6 +23,7 @@ jobs:
       - run: npm run lint
 
   test:
+    name: Execute Test Suite
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,6 +37,7 @@ jobs:
       - run: npm run test
 
   hotfix:
+    name: Apply Fix Changes
     runs-on: ubuntu-latest
     needs: [lint, test]
     permissions:
@@ -49,10 +52,10 @@ jobs:
           ref: 'releases/${{ github.event.inputs.release_version }}'
           fetch-depth: 0
 
-      - name: Fetch all tags
+      - name: Fetch Git Tags
         run: git fetch --tags --force
 
-      - name: Set fix number
+      - name: Generate Fix Identifier
         id: set-fix-number
         run: echo "FIX_NUMBER=${{ github.run_number }}" >> $GITHUB_OUTPUT
 
@@ -71,7 +74,7 @@ jobs:
           docker push $REGISTRY/app:${RELEASE_VERSION}_fix${{ steps.set-fix-number.outputs.FIX_NUMBER }}
           docker push $REGISTRY/app:${RELEASE_VERSION}_latest
 
-      - name: Determine last tag in release
+      - name: Find Latest Release Tag
         id: find_prev
         run: |
           PREV=$(git tag --list "v${RELEASE_VERSION}*" --sort=-creatordate | head -n 1)
@@ -89,7 +92,7 @@ jobs:
           git tag v${RELEASE_VERSION}_fix${{ steps.set-fix-number.outputs.FIX_NUMBER }}
           git push origin v${RELEASE_VERSION}_fix${{ steps.set-fix-number.outputs.FIX_NUMBER }}
 
-      - name: Get commit history
+      - name: Extract Fix Commits
         id: get-commits
         run: |
           PREV_TAG="${{ steps.find_prev.outputs.previous_tag }}"
@@ -100,7 +103,7 @@ jobs:
           echo "$COMMITS" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
-      - name: Add comment to release issue
+      - name: Update Release Issue
         env:
           FIX_NUMBER: ${{ steps.set-fix-number.outputs.FIX_NUMBER }}
         run: |
@@ -115,14 +118,14 @@ jobs:
           fi
           
           COMMENT=$(cat <<EOF
-          ### Hotfix applied
+          ### Fix Deployed
           
-          **Fix version:** ${RELEASE_VERSION}_fix${FIX_NUMBER}  
-          **Date:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')  
-          **Author:** ${{ github.actor }}  
+          **Исправленная версия:** ${RELEASE_VERSION}_fix${FIX_NUMBER}  
+          **Дата:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')  
+          **Автор:** ${{ github.actor }}  
           **Docker image:** \`${{ env.REGISTRY }}/app:${RELEASE_VERSION}_fix${FIX_NUMBER}\`  
           
-          **Commits since last release:**
+          **Включенные изменения:**
           ${{ env.COMMITS }}
           EOF
           )
