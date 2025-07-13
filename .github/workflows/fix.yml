@@ -118,7 +118,7 @@ jobs:
           fi
           
           COMMENT=$(cat <<EOF
-          ### Fix Deployed
+          🛠️ ### Включены изменения
           
           **Исправленная версия:** ${RELEASE_VERSION}_fix${FIX_NUMBER}  
           **Дата:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')  

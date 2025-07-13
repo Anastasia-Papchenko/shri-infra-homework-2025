@@ -117,7 +117,7 @@ jobs:
           gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
           
           ISSUE_BODY=$(cat <<EOF
-          ## Release v${VERSION}
+          ## Release v${VERSION} ✨
           
           **Дата:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')
           **Автор:** ${{ github.actor }}

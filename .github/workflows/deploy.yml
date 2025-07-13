@@ -1,19 +1,20 @@
-name: Deploy
+name: Production Deployment Pipeline
 on:
   workflow_dispatch:
     inputs:
       release_version:
-        description: 'Версия релиза для деплоя'
+        description: 'Версия для деплоя'
         required: true
         type: string
 
 jobs:
   verify-image:
+    name: Verify Docker Image Exists
     runs-on: ubuntu-latest
     env:
       REGISTRY: ${{ secrets.REGISTRY_ID }}
     steps:
-      - name: Check image exists
+      - name: Authenticate with Container Registry
         env:
           PA_OAUTH_TOKEN: ${{ secrets.PA_OAUTH_TOKEN }}
         run: |
@@ -31,12 +32,13 @@ jobs:
           fi
 
   deploy:
+    name: Deploy to Production
     runs-on: ubuntu-latest
     needs: verify-image
     env:
       REGISTRY: ${{ secrets.REGISTRY_ID }}
     steps:
-      - name: Deploy to production server
+      - name: Execute Deployment via SSH
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VM_IP }}
@@ -63,8 +65,8 @@ jobs:
             
             sleep 5
             docker ps --filter "name=app" --format "table {{.Names}}\t{{.Status}}"
-            echo "Приложение доступно по адресу: http://$(curl -s ifconfig.me):3000/hw/store"
-      - name: Add deployment comment to issue
+            echo "Приложение доступно по адресу: http://89.169.189.241:3000/hw/store"
+      - name: Update Release Tracking
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -87,12 +89,12 @@ jobs:
           fi
 
           COMMENT=$(cat <<EOF
-          **Deployed to production**
+          🚀 **Запущен в прод**
 
-          **Release version:** ${{ github.event.inputs.release_version }}
+          **Версия релиза:** ${{ github.event.inputs.release_version }}
+          **Дата:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          **Автор:** ${{ github.actor }}
           **Docker image:** ${{ env.REGISTRY }}/app:${{ github.event.inputs.release_version }}_latest
-          **Deployed at:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')
-          **Deployed by:** ${{ github.actor }}
           EOF
           )
 
