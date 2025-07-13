@@ -110,12 +110,12 @@ jobs:
           ISSUE_ID=$(gh issue list --search "Release v${RELEASE_VERSION} in:title" --json number -q '.[0].number')
           
           if [ -z "$ISSUE_ID" ]; then
-            echo "⚠️ Release issue not found!"
+            echo "Release issue not found!"
             exit 0  
           fi
           
           COMMENT=$(cat <<EOF
-          ### 🔧 Hotfix applied
+          ### Hotfix applied
           
           **Fix version:** ${RELEASE_VERSION}_fix${FIX_NUMBER}  
           **Date:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')  

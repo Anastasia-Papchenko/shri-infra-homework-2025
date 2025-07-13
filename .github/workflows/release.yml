@@ -1,9 +1,10 @@
-name: Release
+name: Release Pipeline
 on:
   workflow_dispatch:
 
 jobs:
   lint:
+    name: Validate Code Quality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,6 +15,7 @@ jobs:
       - run: npm run lint
 
   test:
+    name: Run Test Suite
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +26,7 @@ jobs:
       - run: npm run test
 
   release:
+    name: Publish Release
     runs-on: ubuntu-latest
     needs: [lint, test]
     permissions:
@@ -39,7 +42,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set version
+      - name: Set Release Version
         id: set-version
         run: echo "VERSION=${{ github.run_number }}" >> $GITHUB_OUTPUT
 
@@ -52,7 +55,7 @@ jobs:
           git switch -c releases/${{ steps.set-version.outputs.VERSION }}
           git push -u origin releases/${{ steps.set-version.outputs.VERSION }}
 
-      - name: Build and push Docker image
+      - name: Build and Push Docker Image
         env:
           PA_SA_KEY: ${{ secrets.PA_SA_KEY }}
         run: |
@@ -65,14 +68,14 @@ jobs:
           docker push ${{ env.REGISTRY }}/app:${{ steps.set-version.outputs.VERSION }}
           docker push ${{ env.REGISTRY }}/app:${{ steps.set-version.outputs.VERSION }}_latest
 
-      - name: Determine last release tag
+      - name: Find Previous Release Tag
         id: find_prev
         run: |
           PREV=$(git tag --list 'v*' --sort=-v:refname | grep -v '_fix' | head -n 1)
           echo "previous_tag=$PREV" >> $GITHUB_OUTPUT
           echo "Previous tag: $PREV"
 
-      - name: Create Git tag
+      - name: Create Release Tag
         run: |
           git tag v${{ steps.set-version.outputs.VERSION }}
           git push origin v${{ steps.set-version.outputs.VERSION }}
@@ -106,7 +109,7 @@ jobs:
           git commit -m "Update CHANGELOG for v${VERSION}"
           git push origin releases/${VERSION}
 
-      - name: Create GitHub Issue
+      - name: Create Release Issue
         env:
           VERSION: ${{ steps.set-version.outputs.VERSION }}
         run: |
@@ -114,13 +117,13 @@ jobs:
           gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
           
           ISSUE_BODY=$(cat <<EOF
-          ## Release v${VERSION}💫
+          ## Release v${VERSION}
           
-          **Date:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')
-          **Author:** ${{ github.actor }}
+          **Дата:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          **Автор:** ${{ github.actor }}
           **Docker image:** \`${{ env.REGISTRY }}/app:${{ steps.set-version.outputs.VERSION }}\`
           
-          **Changes:**
+          **Изменения:**
           ${{ env.CHANGELOG_BODY }}
           EOF
           )

@@ -87,7 +87,7 @@ jobs:
           fi
 
           COMMENT=$(cat <<EOF
-          🚀 **Deployed to production**
+          **Deployed to production**
 
           **Release version:** ${{ github.event.inputs.release_version }}
           **Docker image:** ${{ env.REGISTRY }}/app:${{ github.event.inputs.release_version }}_latest
