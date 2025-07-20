@@ -29,6 +29,7 @@ export const Application: FC = () => {
     return (
         <div className={bem()}>
             <Helmet titleTemplate='%s — Kogtetochka store' />
+
             <nav className='navbar navbar-expand-sm navbar-light bg-light'>
                 <div className='container'>
                     <Link className={bem('Brand', ['navbar-brand'])} to='/'>
